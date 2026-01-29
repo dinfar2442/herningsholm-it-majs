@@ -1,0 +1,7 @@
+du kan bare højre klikke på den og trykke på run witch powershell eller den nedenunder
+
+
+.\herningsholm-it-tool.ps1
+
+
+kør denne inde i denne mappe 

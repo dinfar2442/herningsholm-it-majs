@@ -1,0 +1,175 @@
+# --- FASE 1: GHOST MODE & ADMIN ---
+$code = '[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);'
+$type = Add-Type -MemberDefinition $code -Name Window -Namespace Console -PassThru
+$type::ShowWindow((Get-Process -Id $pid).MainWindowHandle, 0)
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Start-Process powershell.exe "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
+    Exit
+}
+
+# --- FASE 2: SETUP ---
+Add-Type -AssemblyName PresentationFramework, System.Windows.Forms, System.Drawing
+
+# --- GUI DESIGN ---
+[xml]$xaml = @"
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        Title="Herningsholm IT - Professional V64.4" Height="850" Width="520" Background="#050505" WindowStartupLocation="CenterScreen" ResizeMode="NoResize">
+    <Grid Margin="15">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock Text="HERNINGSHOLM IT SUPPORT" FontSize="26" FontWeight="Black" Foreground="#FFD700" HorizontalAlignment="Center"/>
+            <TextBlock Text="OFFICE ACCOUNT NUKE &amp; REPAIR V64.4" FontSize="11" Foreground="#00FF00" HorizontalAlignment="Center" FontWeight="Bold"/>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Background="#111111">
+            <StackPanel Margin="10,5,15,5">
+                <TextBlock Text="RENS &amp; DESTRUCTION" Foreground="#FF4500" FontWeight="Bold" Margin="0,5,0,2"/>
+                <Button Name="BtnClean" Content="GOD MODE DEEP CLEAN" Background="#B71C1C" Height="45" Foreground="White" FontWeight="Bold" BorderThickness="1" BorderBrush="White"/>
+                <Button Name="BtnDebloat" Content="NUKE BLOATWARE &amp; AVAST" Background="#E65100" Height="40" Foreground="White" FontWeight="Bold" Margin="0,5"/>
+
+                <TextBlock Text="OFFICE &amp; ACCOUNT RESET" Foreground="#00E5FF" FontWeight="Bold" Margin="0,10,0,2"/>
+                <Button Name="BtnTeams" Content="NUKE OFFICE ACCOUNT &amp; installering" Background="#0D47A1" Height="45" Foreground="White" FontWeight="Bold" BorderBrush="White" BorderThickness="1"/>
+                <Button Name="BtnOneDrive" Content="RESET ELLER INSTALLER ONEDRIVE" Background="#01579B" Height="42" Foreground="White" FontWeight="Bold" Margin="0,5"/>
+                
+                <TextBlock Text="SYSTEM &amp; TID" Foreground="#FFD700" FontWeight="Bold" Margin="0,10,0,2"/>
+                <Button Name="BtnUpdate" Content="FORCE WINDOWS UPDATE HAMMER" Background="#C62828" Height="38" Foreground="White" FontWeight="Bold"/>
+                <Button Name="BtnKaisai" Content="AUTO TID SYNC (KAISAI)" Background="#4A148C" Height="38" Foreground="White" FontWeight="Bold" Margin="0,5"/>
+                <Button Name="BtnTimeFix" Content="VAELG DATO/TID MANUELT" Background="#311B92" Height="38" Foreground="White" FontWeight="Bold"/>
+
+                <TextBlock Text="SUPPORT VÆRKTØJER" Foreground="#00FF00" FontWeight="Bold" Margin="0,10,0,2"/>
+                <Button Name="BtnPrint" Content="FIX PRINTER (TOTAL RESET)" Background="#37474F" Height="38" Foreground="White" FontWeight="Bold"/>
+                <Button Name="BtnVirus" Content="DEFENDER QUICK-SCAN" Background="#2E7D32" Height="38" Foreground="White" FontWeight="Bold" Margin="0,5"/>
+                <Button Name="BtnPerf" Content="PROCESS OVERBLIK (DETALJERET)" Background="#004D40" Height="45" Foreground="White" FontWeight="Bold" BorderBrush="#00FF00" BorderThickness="1"/>
+
+                <TextBlock Text="NETVÆRK" Foreground="#00E5FF" FontWeight="Bold" Margin="0,10,0,2"/>
+                <Grid Margin="0,5">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="5"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Button Name="BtnWifi" Grid.Column="0" Content="WIFI MENU" Background="#2E7D32" Height="38" Foreground="White" FontWeight="Bold"/>
+                    <Button Name="BtnWifiForget" Grid.Column="2" Content="NUKE WIFI" Background="#8B0000" Height="38" Foreground="White" FontWeight="Bold"/>
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid Grid.Row="2" Margin="0,10,0,0">
+            <TextBlock Name="StatusTxt" Text="Status: Klar til Office Nuke" Foreground="#00FF00" VerticalAlignment="Center" HorizontalAlignment="Left" FontSize="12" FontWeight="Bold"/>
+            <Button Name="BtnExit" Content="AFSLUT" Background="#333333" Width="100" Height="30" HorizontalAlignment="Right" Foreground="White"/>
+        </Grid>
+    </Grid>
+</Window>
+"@
+
+$reader = (New-Object System.Xml.XmlNodeReader $xaml); $window = [Windows.Markup.XamlReader]::Load($reader)
+$BtnClean=$window.FindName("BtnClean"); $BtnDebloat=$window.FindName("BtnDebloat"); $BtnTeams=$window.FindName("BtnTeams"); $BtnOneDrive=$window.FindName("BtnOneDrive")
+$BtnUpdate=$window.FindName("BtnUpdate"); $BtnKaisai=$window.FindName("BtnKaisai"); $BtnTimeFix=$window.FindName("BtnTimeFix"); $BtnPrint=$window.FindName("BtnPrint")
+$BtnVirus=$window.FindName("BtnVirus"); $BtnPerf=$window.FindName("BtnPerf"); $BtnWifi=$window.FindName("BtnWifi"); $BtnWifiForget=$window.FindName("BtnWifiForget")
+$BtnExit=$window.FindName("BtnExit")
+
+function Run-Job-Visible ([scriptblock]$Code) {
+    $Encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($Code.ToString()))
+    Start-Process powershell.exe -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-EncodedCommand", $Encoded -Wait
+}
+
+# --- ACTIONS ---
+
+$BtnTeams.Add_Click({ 
+    Run-Job-Visible { 
+        Write-Host "--- vi nuker lortet ---" -ForegroundColor Blue
+        
+        Write-Host "> Lukker alle Office programmer..."
+        Stop-Process -Name "winword","excel","powerpnt","outlook","onenote","lync","ms-teams" -Force -ErrorAction SilentlyContinue
+
+        Write-Host "> Fjerner gemte Office Identities i Registry..."
+        Remove-Item -Path "HKCU:\Software\Microsoft\Office\16.0\Common\Identity\Identities\*" -Recurse -Force -ErrorAction SilentlyContinue
+        
+        Write-Host "> Rydder Office Token Cache..."
+        $localPath = "$env:LocalAppData\Microsoft\Office\16.0\Licensing"
+        Remove-Item -Path "$localPath\*" -Recurse -Force -ErrorAction SilentlyContinue
+        
+        Write-Host "> Tjekker filer og geninstallerer hvis nødvendigt..."
+        $apps = @("WINWORD.EXE", "EXCEL.EXE", "POWERPNT.EXE", "OUTLOOK.EXE")
+        $missing = $false
+        foreach ($a in $apps) {
+            if (!(Test-Path "C:\Program Files\Microsoft Office\root\Office16\$a") -and !(Test-Path "C:\Program Files (x86)\Microsoft Office\root\Office16\$a")) {
+                Write-Host "[!] Mangler: $a" -ForegroundColor Red; $missing = $true
+            }
+        }
+        
+        if ($missing) {
+            Write-Host "> Starter frisk installation via Winget..."
+            winget install --id Microsoft.Office -e --silent --accept-package-agreements
+        } else {
+            Write-Host "> Alle apps fundet. Kontoen er nu nulstillet." -ForegroundColor Green
+            Write-Host "> Eleven skal logge ind igen næste gang de åbner Word."
+        }
+
+        Read-Host "`nFærdig! Tryk Enter"
+    } 
+})
+
+# --- ONEDRIVE RESET FRA V64.3 ---
+$BtnOneDrive.Add_Click({
+    Run-Job-Visible {
+        Write-Host "--- ONEDRIVE OPERATION ---" -ForegroundColor Blue
+        Stop-Process -Name "OneDrive" -Force -ErrorAction SilentlyContinue
+        $paths = @("$env:LocalAppData\Microsoft\OneDrive\OneDrive.exe", "$env:ProgramFiles\Microsoft OneDrive\OneDrive.exe", "$env:ProgramFiles(x86)\Microsoft OneDrive\OneDrive.exe")
+        $foundPath = ""; foreach ($p in $paths) { if (Test-Path $p) { $foundPath = $p; break } }
+        if ($foundPath -ne "") {
+            Write-Host "[OK] Nulstiller OneDrive..." -ForegroundColor Green
+            Start-Process $foundPath -ArgumentList "/reset"
+        } else {
+            Write-Host "[!] Installerer OneDrive..." -ForegroundColor Red
+            winget install --id Microsoft.OneDrive -e --silent --accept-package-agreements
+        }
+        Read-Host "Færdig! Enter"
+    }
+})
+
+# --- RESTEN AF SYSTEMET ---
+$BtnClean.Add_Click({ Run-Job-Visible { 
+    Write-Host "!!! GOD MODE CLEANING !!!" -ForegroundColor Green
+    Stop-Service wuauserv, bits, cryptsvc, spooler -Force -ErrorAction SilentlyContinue
+    dism /online /cleanup-image /startcomponentcleanup /resetbase
+    vssadmin delete shadows /all /quiet
+    wevtutil el | Foreach-Object {wevtutil cl "$_"}
+    Remove-Item "C:\Windows\SoftwareDistribution\*" -Recurse -Force -ErrorAction SilentlyContinue
+    $paths = @("$env:TEMP\*", "C:\Windows\Temp\*", "C:\Windows\Prefetch\*", "C:\Windows\System32\ccmcache\*")
+    foreach ($p in $paths) { Remove-Item $p -Recurse -Force -ErrorAction SilentlyContinue }
+    ipconfig /flushdns; netsh int ip reset; netsh winsock reset
+    Start-Service wuauserv, bits, cryptsvc, spooler -ErrorAction SilentlyContinue
+    Read-Host "Færdig! Enter" 
+} })
+
+$BtnDebloat.Add_Click({ Run-Job-Visible { 
+    Write-Host "--- NUKING BLOAT ---" -ForegroundColor Red
+    $nuke = @("*Avast*", "*AVG*", "*McAfee*", "*Norton*", "*TikTok*", "*Instagram*", "*Disney*", "*Netflix*", "*Spotify*", "*CandyCrush*")
+    foreach ($item in $nuke) { Get-AppxPackage -AllUsers $item -ErrorAction SilentlyContinue | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue }
+    Read-Host "Færdig! Enter" 
+} })
+
+$BtnPerf.Add_Click({ Run-Job-Visible { 
+    Write-Host "--- PROCESS OVERBLIK ---" -ForegroundColor Cyan
+    Get-Process | Sort-Object CPU -Descending | Select-Object -First 15 @{Name="Program"; Expression={$_.ProcessName}}, @{Name="CPU"; Expression={[math]::Round($_.CPU, 2)}}, @{Name="RAM(MB)"; Expression={[math]::Round($_.WorkingSet / 1MB, 2)}}, @{Name="ID"; Expression={$_.Id}} | Format-Table -AutoSize
+    Read-Host "Enter" 
+} })
+
+$BtnUpdate.Add_Click({ Run-Job-Visible { Write-Host "Update Hammer..."; Get-WindowsUpdate -Install -AcceptAll; Read-Host "Enter" } })
+$BtnKaisai.Add_Click({ Run-Job-Visible { Start-Process "ms-availablenetworks:"; Read-Host "Kaisai Login -> Enter"; tzutil /s "W. Europe Standard Time"; w32tm /resync /force /nowait; netsh wlan delete profile Kaisai; Read-Host "Enter" } })
+$BtnPrint.Add_Click({ Run-Job-Visible { Stop-Service Spooler -Force; Remove-Item "$env:SystemRoot\System32\Spool\Printers\*" -Recurse -Force; Start-Service Spooler; Read-Host "Enter" } })
+$BtnVirus.Add_Click({ Run-Job-Visible { Start-MpScan -ScanType QuickScan; Read-Host "Enter" } })
+$BtnWifi.Add_Click({ Start-Process "ms-availablenetworks:" })
+$BtnWifiForget.Add_Click({ Run-Job-Visible { netsh wlan delete profile name=* i=*; Read-Host "WiFi Nuked! Enter" } })
+$BtnTimeFix.Add_Click({
+    $TimeWin = New-Object Windows.Window; $TimeWin.Title = "Vælg Tid"; $TimeWin.Width = 300; $TimeWin.Height = 350; $TimeWin.Background = "#111111"
+    $Stack = New-Object Windows.Controls.StackPanel
+    $Calendar = New-Object Windows.Controls.DatePicker; $Calendar.Margin = 20; $Calendar.SelectedDate = Get-Date
+    $TimeBox = New-Object Windows.Controls.TextBox; $TimeBox.Text = (Get-Date -Format "HH:mm"); $TimeBox.Margin = 20
+    $GoBtn = New-Object Windows.Controls.Button; $GoBtn.Content = "SÆT TID NU"; $GoBtn.Height = 50; $GoBtn.Background = "#2E7D32"; $GoBtn.Foreground = "White"
+    $GoBtn.Add_Click({ $d = $Calendar.SelectedDate.ToString("dd-MM-yyyy"); $t = $TimeBox.Text; cmd.exe /c "date $d"; cmd.exe /c "time $t"; $TimeWin.Close() })
+    $Stack.Children.Add($Calendar); $Stack.Children.Add($TimeBox); $Stack.Children.Add($GoBtn)
+    $TimeWin.Content = $Stack; $TimeWin.ShowDialog() | Out-Null
+})
+$BtnExit.Add_Click({ $window.Close() })
+
+$window.ShowDialog() | Out-Null
