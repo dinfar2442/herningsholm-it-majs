@@ -93,6 +93,10 @@ try {
                     <Button Name="BtnWinHello" Content="ANSIGT &amp; BIOMETRI" Background="#FF6F00" Foreground="White" FontFamily="Segoe UI Semibold" FontWeight="SemiBold" Margin="4" Height="70" FontSize="10" ToolTip="Reparerer Windows Hello PIN, TPM &amp; biometriske fejl"/>
                     <Button Name="BtnUI" Content="FIX MENU" Background="#9C27B0" Foreground="White" FontFamily="Segoe UI Semibold" FontWeight="SemiBold" Margin="4" Height="70" FontSize="10" ToolTip="Genstarter Windows Explorer"/>
                 </UniformGrid>
+
+                <!-- AI ASSISTENT -->
+                <TextBlock Text="🤖 AI IT-ASSISTENT" FontFamily="Segoe UI Semibold" FontSize="11" FontWeight="SemiBold" Foreground="#2C3E50" Margin="0,0,0,8" Padding="3,0,0,0"/>
+                <Button Name="BtnAI" Content="🤖  SPØRG AI-ASSISTENTEN  (ONLINE)" Background="#00796B" Foreground="White" FontFamily="Segoe UI Semibold" FontWeight="SemiBold" Margin="4" Height="55" FontSize="13" ToolTip="Chat med online AI-assistent om IT-problemer på Herningsholm (kræver API-nøgle)"/>
             </StackPanel>
         </ScrollViewer>
 
@@ -115,7 +119,7 @@ $reader = (New-Object System.Xml.XmlNodeReader $xaml)
 $window = [Windows.Markup.XamlReader]::Load($reader)
 
 # Forbindelse af alle knapper
-$nodes = "BtnInstall","BtnPortal","BtnBloat","BtnTeams","BtnWifiFix","BtnAsset","BtnNet","BtnUpdate","BtnCloud","BtnDisk","BtnPerf","BtnKaisai","BtnChrome","BtnDeepClean","BtnPrint","BtnElevPrint","BtnOfficeRepair","BtnWinHello","BtnUI","BtnSearch","BtnExit"
+$nodes = "BtnInstall","BtnPortal","BtnBloat","BtnTeams","BtnWifiFix","BtnAsset","BtnNet","BtnUpdate","BtnCloud","BtnDisk","BtnPerf","BtnKaisai","BtnChrome","BtnDeepClean","BtnPrint","BtnElevPrint","BtnOfficeRepair","BtnWinHello","BtnUI","BtnSearch","BtnAI","BtnExit"
 foreach($node in $nodes) { Set-Variable -Name $node -Value $window.FindName($node) }
 
 function Invoke-Task ([scriptblock]$Code, $ArgsList, [switch]$Wait) {
@@ -413,6 +417,14 @@ $ElevPrintPrinterPath = ""
 
 # WordMat download URL (leave empty to open website instead)
 $WordMatUrl = "https://www.eduap.com/download/download.php?f=WordMatP.exe"
+
+# Online AI API konfiguration (OpenAI-kompatibel)
+# Sæt din OpenAI API-nøgle her eller via AI-dialogen for at aktivere AI-assistenten
+$OpenAI_ApiKey   = ""
+$OpenAI_Model    = "gpt-4o-mini"
+$OpenAI_BaseUrl  = "https://api.openai.com/v1/chat/completions"
+$OpenAI_MaxTokens = 1500
+$OpenAI_SysPrompt = "Du er en hjælpsom IT-supportassistent på Herningsholm skole i Danmark. Du svarer altid på dansk. Du hjælper med Windows, Office 365, Teams, OneDrive, printere og skolens netværk. Vær konkret og giv trin-for-trin vejledning. Hold svar korte og praktiske."
 
 
 $BtnCloud.Add_Click({ Run-Task { Stop-Process -Name "OneDrive" -Force -EA SilentlyContinue; if(Test-Path "$env:LocalAppData\Microsoft\OneDrive\onedrive.exe"){& "$env:LocalAppData\Microsoft\OneDrive\onedrive.exe" /reset}; Remove-Item "$env:LocalAppData\Microsoft\OneDrive\settings" -Recurse -Force -EA SilentlyContinue; cmdkey /list | ForEach-Object { if($_ -like "*OneDrive*") { cmdkey /delete ($_ -split " ")[-1] } } } })
@@ -2043,6 +2055,169 @@ $BtnWinHello.Add_Click({
         $winHelloWin.ShowDialog() | Out-Null
     } catch {
         [System.Windows.MessageBox]::Show("Windows Hello fejl:`n`n$($_.Exception.Message)", "Fejl", "OK", "Error")
+    }
+})
+
+$BtnAI.Add_Click({
+    try {
+        [xml]$aiXaml = @"
+        <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                Title="AI IT-Assistent • Herningsholm" Height="620" Width="720"
+                Background="#FAFAFA" WindowStartupLocation="CenterOwner" ResizeMode="CanResize">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="60"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="60"/>
+                    <RowDefinition Height="35"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Background="#00796B" Padding="20,10">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="🤖 AI IT-ASSISTENT • Herningsholm" Foreground="White" FontFamily="Segoe UI Semibold" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Online AI-hjælp til IT-support (kræver OpenAI API-nøgle)" Foreground="#B2DFDB" FontFamily="Segoe UI" FontSize="9" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <ScrollViewer Grid.Row="1" Name="ChatScroll" VerticalScrollBarVisibility="Auto" Background="#F5F5F5" Margin="0,1,0,0">
+                    <TextBox Name="ChatLog" Background="#F5F5F5" Foreground="#1C1C1C" FontFamily="Segoe UI" FontSize="11"
+                             IsReadOnly="True" TextWrapping="Wrap" Padding="15" BorderThickness="0" VerticalScrollBarVisibility="Disabled"/>
+                </ScrollViewer>
+
+                <Border Grid.Row="2" Background="#E0F2F1" Padding="12,6" BorderBrush="#B2DFDB" BorderThickness="0,1,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="API-nøgle: " Foreground="#555" FontSize="10" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <PasswordBox Name="ApiKeyBox" Width="280" Height="26" FontSize="10" VerticalContentAlignment="Center" BorderBrush="#00796B" BorderThickness="1" Padding="5,2" ToolTip="Indsæt din OpenAI API-nøgle (sk-...)"/>
+                        <TextBlock Name="ApiStatus" Text="" Foreground="#E53935" FontSize="10" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="3" Background="#EEEEEE" Padding="12,8" BorderBrush="#CCCCCC" BorderThickness="0,1,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="90"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" Name="UserInput" FontFamily="Segoe UI" FontSize="12" Padding="8,6"
+                                 Height="40" VerticalContentAlignment="Center" BorderBrush="#00796B" BorderThickness="1.5"
+                                 Margin="0,0,8,0" ToolTip="Stil dit IT-spørgsmål her og tryk ENTER eller SEND"/>
+                        <Button Grid.Column="1" Name="SendBtn" Content="SEND ↵" Background="#00796B" Foreground="White"
+                                FontFamily="Segoe UI Semibold" FontWeight="SemiBold" Height="40" FontSize="11"
+                                ToolTip="Send spørgsmål til AI"/>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Row="4" Background="#F5F5F5" Padding="12,0" BorderBrush="#E0E0E0" BorderThickness="0,1,0,0">
+                    <TextBlock Name="StatusText" Text="Skriv dit IT-spørgsmål og tryk SEND" Foreground="#777" FontSize="10" VerticalAlignment="Center"/>
+                </Border>
+            </Grid>
+        </Window>
+"@
+        $aiWin       = [Windows.Markup.XamlReader]::Load((New-Object System.Xml.XmlNodeReader $aiXaml))
+        $chatLog     = $aiWin.FindName("ChatLog")
+        $chatScroll  = $aiWin.FindName("ChatScroll")
+        $userInput   = $aiWin.FindName("UserInput")
+        $sendBtn     = $aiWin.FindName("SendBtn")
+        $statusText  = $aiWin.FindName("StatusText")
+        $apiKeyBox   = $aiWin.FindName("ApiKeyBox")
+        $apiStatus   = $aiWin.FindName("ApiStatus")
+
+        # Conversation history stored as JSON-serializable list
+        $convHistory = [System.Collections.Generic.List[object]]::new()
+
+        $chatLog.Text = "Velkommen til AI IT-Assistenten!`n`nJeg kan hjælpe med IT-problemer på Herningsholm.`nEksempler på spørgsmål:`n  • Min printer virker ikke`n  • Kan ikke logge ind på Office 365`n  • Teams starter ikke`n  • OneDrive synkroniserer ikke`n`nIndsæt din OpenAI API-nøgle ovenfor og stil dit spørgsmål.`n" + ("─" * 60) + "`n`n"
+
+        $sendLogic = {
+            $question = $userInput.Text.Trim()
+            if ([string]::IsNullOrWhiteSpace($question)) { return }
+
+            # Resolve API key: use box value, fall back to script-level config
+            $key = $apiKeyBox.Password.Trim()
+            if ([string]::IsNullOrWhiteSpace($key)) { $key = $script:OpenAI_ApiKey }
+
+            if ([string]::IsNullOrWhiteSpace($key)) {
+                $apiStatus.Text = "⚠ Ingen API-nøgle!"
+                $chatLog.Text += "⚠ Ingen API-nøgle konfigureret.`nIndsæt din OpenAI API-nøgle i feltet ovenfor (sk-...).`n`n"
+                $chatScroll.ScrollToBottom()
+                return
+            }
+            $apiStatus.Text = ""
+
+            # Display user message
+            $chatLog.Text += "👤 DU: $question`n`n"
+            $userInput.Text = ""
+            $sendBtn.IsEnabled = $false
+            $statusText.Text = "🤖 AI svarer..."
+            $chatScroll.ScrollToBottom()
+            [System.Windows.Forms.Application]::DoEvents()
+
+            # Add to history
+            $convHistory.Add([pscustomobject]@{ role = "user"; content = $question })
+
+            try {
+                # Build messages array
+                $messages = [System.Collections.Generic.List[object]]::new()
+                $messages.Add([pscustomobject]@{ role = "system"; content = $script:OpenAI_SysPrompt })
+                foreach ($msg in $convHistory) { $messages.Add($msg) }
+
+                $bodyObj = [pscustomobject]@{
+                    model       = $script:OpenAI_Model
+                    messages    = $messages
+                    max_tokens  = $script:OpenAI_MaxTokens
+                    temperature = 0.7
+                }
+                $bodyJson = $bodyObj | ConvertTo-Json -Depth 10
+
+                $headers = @{
+                    "Authorization" = "Bearer $key"
+                    "Content-Type"  = "application/json; charset=utf-8"
+                }
+
+                $response  = Invoke-RestMethod -Uri $script:OpenAI_BaseUrl -Method Post -Headers $headers -Body ([System.Text.Encoding]::UTF8.GetBytes($bodyJson)) -ContentType "application/json" -ErrorAction Stop
+                $aiReply   = $response.choices[0].message.content.Trim()
+
+                $convHistory.Add([pscustomobject]@{ role = "assistant"; content = $aiReply })
+                $chatLog.Text += "🤖 AI: $aiReply`n`n" + ("─" * 60) + "`n`n"
+
+                # Persist API key for the session if entered via box
+                if (-not [string]::IsNullOrWhiteSpace($apiKeyBox.Password)) {
+                    $script:OpenAI_ApiKey = $apiKeyBox.Password.Trim()
+                }
+            } catch {
+                $ex = $_.Exception
+                $errMsg = $ex.Message
+                # Provide user-friendly Danish error messages for common scenarios
+                if ($errMsg -match "401|Unauthorized|Unauthenticated") {
+                    $friendlyErr = "Ugyldig API-nøgle (401). Tjek at nøglen er korrekt og stadig aktiv på platform.openai.com."
+                } elseif ($errMsg -match "429|Rate limit|Too Many") {
+                    $friendlyErr = "For mange forespørgsler (429). Vent et øjeblik og prøv igen."
+                } elseif ($errMsg -match "quota|billing|insufficient") {
+                    $friendlyErr = "API-kvote overskredet. Tjek din faktureringsplan på platform.openai.com."
+                } elseif ($errMsg -match "timeout|Unable to connect|No such host|name resolution") {
+                    $friendlyErr = "Ingen internetforbindelse eller API ikke tilgængeligt. Tjek netværket."
+                } else {
+                    $friendlyErr = $errMsg
+                }
+                $chatLog.Text += "⚠ Fejl: $friendlyErr`n`n"
+            }
+
+            $sendBtn.IsEnabled = $true
+            $statusText.Text   = "Klar til næste spørgsmål"
+            $chatScroll.ScrollToBottom()
+        }
+
+        $sendBtn.Add_Click($sendLogic)
+        $userInput.Add_KeyDown({
+            param($s, $e)
+            if ($e.Key -eq [System.Windows.Input.Key]::Return) { & $sendLogic }
+        })
+
+        $aiWin.Owner = $window
+        $aiWin.ShowDialog() | Out-Null
+    } catch {
+        [System.Windows.MessageBox]::Show("AI-assistent fejl:`n`n$($_.Exception.Message)", "Fejl", "OK", "Error")
     }
 })
 
